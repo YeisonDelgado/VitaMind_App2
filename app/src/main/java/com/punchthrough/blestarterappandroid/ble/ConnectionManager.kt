@@ -41,6 +41,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 /** Maximum BLE MTU size as defined in gatt_api.h. */
 private const val GATT_MAX_MTU_SIZE = 517
 private const val GATT_MIN_MTU_SIZE = 23
+var onDataReceived: ((String) -> Unit)? = null
 
 @SuppressLint("MissingPermission") // Assume permissions are handled by UI
 object ConnectionManager {
@@ -435,6 +436,9 @@ object ConnectionManager {
             when (status) {
                 BluetoothGatt.GATT_SUCCESS -> {
                     Timber.i("Read characteristic $uuid | value: ${value.toHexString()}")
+
+                    val textValue = value.toString(Charsets.UTF_8)
+                    Timber.d("Valor recibido en texto plano: $textValue")
                     listenersAsSet.forEach {
                         it.get()?.onCharacteristicRead?.invoke(gatt.device, characteristic, value)
                     }
@@ -492,16 +496,49 @@ object ConnectionManager {
             }
         }
 
+
         override fun onCharacteristicChanged(
             gatt: BluetoothGatt,
             characteristic: BluetoothGattCharacteristic,
             value: ByteArray
         ) {
             Timber.i("Characteristic ${characteristic.uuid} changed | value: ${value.toHexString()}")
-            listenersAsSet.forEach {
-                it.get()?.onCharacteristicChanged?.invoke(gatt.device, characteristic, value)
+
+            val stringValue = value?.toString(Charsets.UTF_8)
+            Timber.d("Valor crudo como string: [${stringValue}]")
+
+            val cleaned = stringValue?.trim()
+
+            if (cleaned != null) {
+                // Extraemos los valores con regex o división
+                val partes = cleaned.split("|")
+
+                val datoStr = partes.find { it.contains("Dato:") }?.substringAfter("Dato:")?.trim()
+                val dato = datoStr?.replace(",", ".")?.toDoubleOrNull()
+
+                // Procesamos el dato principal
+                dato?.let { v ->
+                    val LOW_THRESHOLD = 20.0
+                    val HIGH_THRESHOLD = 60.0
+
+                    when {
+                        v < LOW_THRESHOLD -> Timber.d("Estrés bajo (Dato): $v")
+                        v in LOW_THRESHOLD..HIGH_THRESHOLD -> Timber.d("Estrés moderado (Dato): $v")
+                        v > HIGH_THRESHOLD -> Timber.d("¡Estrés alto! (Dato): $v")
+                    }
+                } ?: Timber.e("Valor 'Dato' no numérico: [$datoStr]")
+            } else {
+                Timber.e("Valor recibido es nulo")
             }
-        }
+
+                // Enviar a observador si tienes uno
+                onDataReceived?.invoke(stringValue ?: "")
+
+                listenersAsSet.forEach {
+                    it.get()?.onCharacteristicChanged?.invoke(gatt.device, characteristic, value)
+                }
+            }
+
 
         @Deprecated("Deprecated for Android 13+")
         @Suppress("DEPRECATION")

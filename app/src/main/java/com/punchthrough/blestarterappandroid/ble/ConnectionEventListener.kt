@@ -48,6 +48,7 @@ class ConnectionEventListener {
             characteristic: BluetoothGattCharacteristic,
             value: ByteArray
         ) -> Unit
+
     )? = null
 
     var onCharacteristicRead: (

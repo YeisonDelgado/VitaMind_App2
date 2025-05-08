@@ -1,6 +1,5 @@
-<?xml version="1.0" encoding="utf-8"?>
 <!--
-  ~ Copyright 2024 Punch Through Design LLC
+  ~ Copyright 2025 Punch Through Design LLC
   ~
   ~ Licensed under the Apache License, Version 2.0 (the "License");
   ~ you may not use this file except in compliance with the License.
@@ -15,13 +14,7 @@
   ~ limitations under the License.
   -->
 
-<resources>
-<color name="colorPrimary">#3F51B5</color>
-<color name="colorPrimaryDark">#303F9F</color>
-<color name="colorAccent">#FF4081</color>
-<color name="colorBackground">#F5F5F5</color>
-<color name="colorTextPrimary">#212121</color>
-<color name="colorTextSecondary">#757575</color>
-<color name="colorButton">#6200EE</color>
-<color name="colorButtonText">#FFFFFF</color>
-</resources>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <solid android:color="#D9F4F8"/>
+    <size android:width="140dp" android:height="140dp"/>
+</shape>

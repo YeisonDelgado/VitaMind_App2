@@ -22,12 +22,16 @@ import android.app.AlertDialog
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGattCharacteristic
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.view.MenuItem
 import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
+import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -55,6 +59,7 @@ class BleOperationsActivity : AppCompatActivity() {
             ?: error("Missing BluetoothDevice from MainActivity!")
     }
     private val dateFormatter = SimpleDateFormat("MMM d, HH:mm:ss", Locale.US)
+    private val gsrHistory = mutableListOf<Pair<Long, Float>>()
     private val characteristics by lazy {
         ConnectionManager.servicesOnDevice(device)?.flatMap { service ->
             service.characteristics ?: listOf()
@@ -83,10 +88,16 @@ class BleOperationsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ConnectionManager.registerListener(connectionEventListener)
-
         binding = ActivityBleOperationsBinding.inflate(layoutInflater)
-
         setContentView(binding.root)
+
+        val btnHistorial = findViewById<Button>(R.id.btnHistorial)
+        btnHistorial.setOnClickListener {
+            val intent = Intent(this, HistorialActivity::class.java)
+            intent.putExtra("gsr_history", ArrayList(gsrHistory))
+            startActivity(intent)
+        }
+
         supportActionBar?.apply {
             setDisplayHomeAsUpEnabled(true)
             setDisplayShowTitleEnabled(true)
@@ -164,9 +175,11 @@ class BleOperationsActivity : AppCompatActivity() {
                             log("Reading from ${characteristic.uuid}")
                             ConnectionManager.readCharacteristic(device, characteristic)
                         }
+
                         CharacteristicProperty.Writable, CharacteristicProperty.WritableWithoutResponse -> {
                             showWritePayloadDialog(characteristic)
                         }
+
                         CharacteristicProperty.Notifiable, CharacteristicProperty.Indicatable -> {
                             if (notifyingCharacteristics.contains(characteristic.uuid)) {
                                 log("Disabling notifications on ${characteristic.uuid}")
@@ -234,53 +247,114 @@ class BleOperationsActivity : AppCompatActivity() {
             }
 
             onCharacteristicChanged = { _, characteristic, value ->
-                log("Value changed on ${characteristic.uuid}: ${value.toHexString()}")
+                val dataStr = value.toString(Charsets.UTF_8)
+                val gsrValue = dataStr.substringAfter("Dato: ").toFloatOrNull()
+                if (gsrValue != null) {
+                    gsrHistory.add(System.currentTimeMillis() to gsrValue)
+                }
+
+                val estado = when {
+                    gsrValue == null -> "Valor inválido"
+                    gsrValue < 700 -> "Nivel Bajo"
+                    gsrValue < 850 -> "Nivel Moderado"
+                    gsrValue < 1000 -> "Nivel Alto"
+                    else -> "Nivel Crítico"
+                }
+
+                runOnUiThread {
+                    //al textViewDatos = findViewById<TextView>(R.id.gsr_data_text_view)
+                    //textViewDatos.text = "GSR: ${gsrValue ?: "N/A"}\nEstado: $estado"
+
+                    // Actualiza la recomendación basada en el nivel de estrés
+                    val recommendationTextView = findViewById<TextView>(R.id.stress_recommendation)
+                    val stressIcon = findViewById<ImageView>(R.id.stress_icon)
+                    val moreInfoButton = findViewById<Button>(R.id.btnMoreInfo)
+
+                    val recommendation = when {
+                        gsrValue == null -> {
+                            stressIcon.visibility = View.GONE
+                            moreInfoButton.visibility = View.GONE
+                            "No se pudo determinar el nivel de estrés."
+                        }
+                        gsrValue < 700 -> {
+                            stressIcon.setImageResource(R.drawable.ic_very_low)  // Asegúrate de tener un ícono para relajación
+                            stressIcon.visibility = View.VISIBLE
+                            moreInfoButton.visibility = View.GONE
+                            "¡Relájate un poco! Respira profundamente."
+                        }
+                        gsrValue < 850 -> {
+                            stressIcon.setImageResource(R.drawable.ic_low)  // Ícono moderado
+                            stressIcon.visibility = View.VISIBLE
+                            moreInfoButton.visibility = View.GONE
+                            "Buen trabajo, pero podrías relajarte un poco más."
+                        }
+                        gsrValue < 1000 -> {
+                            stressIcon.setImageResource(R.drawable.ic_low)  // Ícono de estrés
+                            stressIcon.visibility = View.VISIBLE
+                            moreInfoButton.visibility = View.GONE
+                            "Tu estrés está en niveles altos. Intenta hacer una pausa."
+                        }
+                        else -> {
+                            stressIcon.setImageResource(R.drawable.ic_critical)  // Ícono crítico
+                            stressIcon.visibility = View.VISIBLE
+                            moreInfoButton.visibility = View.VISIBLE  // Mostrar botón de más información
+                            "Nivel crítico. Busca apoyo si es necesario."
+                        }
+                    }
+
+                    recommendationTextView.text = recommendation
+                }
+
+                log("Valor recibido: $dataStr -> Estado: $estado")
             }
 
             onNotificationsEnabled = { _, characteristic ->
-                log("Enabled notifications on ${characteristic.uuid}")
-                notifyingCharacteristics.add(characteristic.uuid)
-            }
+                    log("Enabled notifications on ${characteristic.uuid}")
+                    notifyingCharacteristics.add(characteristic.uuid)
+                }
 
-            onNotificationsDisabled = { _, characteristic ->
-                log("Disabled notifications on ${characteristic.uuid}")
-                notifyingCharacteristics.remove(characteristic.uuid)
+                onNotificationsDisabled = { _, characteristic ->
+                    log("Disabled notifications on ${characteristic.uuid}")
+                    notifyingCharacteristics.remove(characteristic.uuid)
+                }
             }
         }
+
+
+        private enum class CharacteristicProperty {
+            Readable,
+            Writable,
+            WritableWithoutResponse,
+            Notifiable,
+            Indicatable;
+
+            val action
+                get() = when (this) {
+                    Readable -> "Read"
+                    Writable -> "Write"
+                    WritableWithoutResponse -> "Write Without Response"
+                    Notifiable -> "Toggle Notifications"
+                    Indicatable -> "Toggle Indications"
+                }
+        }
+
+        private fun Activity.hideKeyboard() {
+            hideKeyboard(currentFocus ?: View(this))
+        }
+
+        private fun Context.hideKeyboard(view: View) {
+            val inputMethodManager =
+                getSystemService(Activity.INPUT_METHOD_SERVICE) as InputMethodManager
+            inputMethodManager.hideSoftInputFromWindow(view.windowToken, 0)
+        }
+
+        private fun EditText.showKeyboard() {
+            val inputMethodManager =
+                getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            requestFocus()
+            inputMethodManager.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
+        }
+
+        private fun String.hexToBytes() =
+            this.chunked(2).map { it.uppercase(Locale.US).toInt(16).toByte() }.toByteArray()
     }
-
-    private enum class CharacteristicProperty {
-        Readable,
-        Writable,
-        WritableWithoutResponse,
-        Notifiable,
-        Indicatable;
-
-        val action
-            get() = when (this) {
-                Readable -> "Read"
-                Writable -> "Write"
-                WritableWithoutResponse -> "Write Without Response"
-                Notifiable -> "Toggle Notifications"
-                Indicatable -> "Toggle Indications"
-            }
-    }
-
-    private fun Activity.hideKeyboard() {
-        hideKeyboard(currentFocus ?: View(this))
-    }
-
-    private fun Context.hideKeyboard(view: View) {
-        val inputMethodManager = getSystemService(Activity.INPUT_METHOD_SERVICE) as InputMethodManager
-        inputMethodManager.hideSoftInputFromWindow(view.windowToken, 0)
-    }
-
-    private fun EditText.showKeyboard() {
-        val inputMethodManager = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-        requestFocus()
-        inputMethodManager.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
-    }
-
-    private fun String.hexToBytes() =
-        this.chunked(2).map { it.uppercase(Locale.US).toInt(16).toByte() }.toByteArray()
-}
