@@ -1,65 +1,39 @@
-# Punch Through Android BLE Starter App
+# VitaMind — BLE Android App for Stress Monitoring (VitaminD prototype)
 
-> [!NOTE]
-> This project is currently up-to-date as of `compileSdkVersion` and `targetSdkVersion` of 34 (Android 14).
+> **TL;DR** — An Android app (Kotlin) that connects over **Bluetooth Low Energy** to a wearable/sensor
+> device to capture biometric signals for **VitaminD**, a wellbeing prototype focused on stress
+> monitoring. It handles the full BLE lifecycle (scan → connect → discover services → read/notify) so
+> physiological data can be streamed to the phone for analysis and feedback.
+>
+> **Stack:** Kotlin · Android (min SDK 21, target 34) · Bluetooth Low Energy · Gradle.
+> **Base:** built on Punch Through's open BLE starter, extended for the VitaminD use case.
 
 ---
 
-[![CircleCI build status](https://circleci.com/gh/PunchThrough/ble-starter-android/tree/master.svg?style=svg)](https://circleci.com/gh/PunchThrough/ble-starter-android/tree/master)
+## What it does
+- Scans for and connects to a nearby BLE sensor (e.g. heart-rate / biosignal wearable).
+- Discovers services & characteristics, requests an ATT MTU update, and reads/subscribes to
+  notifications to stream sensor data in real time.
+- Feeds that data into the VitaminD stress-monitoring flow (hardware sensor + app + professional-support
+  platform) — this repo is the **mobile/BLE layer** of that prototype.
 
-Companion Android app project for [Punch Through](https://punchthrough.com)'s "Ultimate Guide to Android BLE Development" blog post for beginners, with examples of how to perform basic BLE operations and some Android BLE tips and tricks on the following:
-
-- Scanning for nearby BLE devices
-- Connecting to BLE devices
-- Discovering services and characteristics
-- Requesting an ATT MTU update
-- Reading and writing data on characteristics and descriptors
-- Enabling and disabling notifications and indications on characteristics
-- Bonding with a BLE device
-- Implementing your own BLE operations serial queuing mechanism
+## BLE capabilities implemented
+Scanning · connecting · service/characteristic discovery · MTU negotiation · read/write on
+characteristics & descriptors · enabling notifications/indications · bonding · a serial queue for
+reliable BLE operations.
 
 ## Setup
-
-1. Clone the project to your directory of choice.
-
+```bash
+git clone https://github.com/YeisonDelgado/VitaMind_App2.git
+# Open in Android Studio, let Gradle sync, run on a device with Bluetooth (BLE needs real hardware)
 ```
-git clone https://github.com/PunchThrough/ble-starter-android.git
-```
+Requires an Android device (BLE does not work on most emulators) and location/Bluetooth permissions.
 
-2. Launch Android Studio and select "Open an existing Android Studio project".
-3. Navigate to the directory where you cloned the project to, and double click on it.
-4. Wait for Gradle sync to complete.
+## Context & next steps
+- Part of the **VitaminD** university prototype (IoT sensing + wellbeing). This repo is the Android/BLE
+  client; the sensor firmware and analysis live alongside it.
+- Next: add on-device signal buffering, a charting screen for live biosignals, and a clean data-sync
+  API to the backend.
 
-## Requirements
-
-This project targets Android 14 and has a min SDK requirement of 21 (Android 5.0), in line with our recommendation in [4 Tips to Make Android BLE Actually Work](https://punchthrough.com/android-ble-development-tips/).
-
-## Contributing
-
-### Reporting bugs
-
-Please [open an issue](https://github.com/PunchThrough/ble-starter-android/issues/new) to report a bug if the app isn't behaving as expected.
-
-### Opening a Pull Request
-
-Please fork the repository and create a feature branch before opening a Pull Request against the `master` branch.
-
-### Linting and code style
-
-The project uses Kotlin's default [coding conventions](https://kotlinlang.org/docs/reference/coding-conventions.html) and includes the `.idea/codeStyle` directory in source control. The project also runs [`ktlint`](https://ktlint.github.io) as part of the CI process to ensure code consistency.
-
-You may run `ktlint` locally using the following command:
-
-```
-./gradlew ktlint
-```
-
-Some simpler violations can be automatically formatted by `ktlint` using the following command:
-
-```
-./gradlew ktlintFormat
-```
-
-## Licensing
-
-This project is licensed under the Apache 2.0. For more details, please see [LICENSE](https://github.com/PunchThrough/ble-starter-android/blob/master/LICENSE).
+> Note: this project builds on the open-source Punch Through "Android BLE Starter"; the BLE plumbing is
+> reused and adapted for VitaminD's stress-monitoring use case.
